@@ -13,84 +13,91 @@ use xil_defaultlib.fixed_pkg.all;
 
 entity network is
     port (
-        Clk : in std_logic;
-        rst : in std_logic;
+        Clk 		: in std_logic;
+        rst 		: in std_logic;
 
-        v_TR1 : out sfixed;
-        u_TR1 : out sfixed;
-        spike_TR1 : out std_logic;
+        v_TR1 		: out sfixed;
+        u_TR1 		: out sfixed;
+        spike_TR1 	: out std_logic;
 
-        v_DRI : out sfixed;
-        u_DRI : out sfixed;
-        spike_DRI : out std_logic;
+        v_DRI 		: out sfixed;
+        u_DRI 		: out sfixed;
+        spike_DRI 	: out std_logic;
 
-        v_DSI : out sfixed;
-        u_DSI : out sfixed;
-        spike_DSI : out std_logic;
+        v_DSI 		: out sfixed;
+        u_DSI 		: out sfixed;
+        spike_DSI 	: out std_logic;
 
-        v_C2 : out sfixed;
-        u_C2 : out sfixed;
-        spike_C2 : out std_logic;
+        v_C2 		: out sfixed;
+        u_C2 		: out sfixed;
+        spike_C2 	: out std_logic;
 
-        v_VSI : out sfixed;
-        u_VSI : out sfixed;
-        spike_VSI   : out std_logic;
+        v_VSI 		: out sfixed;
+        u_VSI 		: out sfixed;
+        spike_VSI   	: out std_logic;
 
-        v_VFN : out sfixed;
-        u_VFN : out sfixed;
-        spike_VFN : out std_logic;
+        v_VFN 		: out sfixed;
+        u_VFN 		: out sfixed;
+        spike_VFN 	: out std_logic;
 
-        v_DFNB : out sfixed;
-        u_DFNB : out sfixed;
-        spike_DFNB : out std_logic;
+        v_DFNB 		: out sfixed;
+        u_DFNB 		: out sfixed;
+        spike_DFNB 	: out std_logic;
 
-        I_D : out sfixed;
-        I_C : out sfixed;
-        I_V : out sfixed;
-        I_VFN : out sfixed;
+        I_D 		: out sfixed;
+        I_C 		: out sfixed;
+        I_V 		: out sfixed;
+        I_VFN 		: out sfixed;
 
-        output1 : out std_logic_vector(6 downto 0)
+        output1 	: out std_logic_vector(6 downto 0)
 
     );
 end network;
 
 architecture RTL of network is
 
+    -- Dimensionless parameters for the Izhilevich neuron.
     constant a 		: sfixed(0 downto -10) 	:= to_sfixed(0.01953125, 0, -10); -- ~0.02
     constant b 		: sfixed(0 downto -10) 	:= to_sfixed(0.2, 0, -10); 
-    constant c      : sfixed(7 downto -10)  := to_sfixed(-65, 7, -10);
-	constant d		: sfixed(3 downto -10) 	:= to_sfixed(8, 3, -10);
-    constant delay  : integer 				:= 5;
- 
-    constant s_Tr1_time : integer    := 8120; 
-    constant s_DRI_time : integer    := 8120;     
+    constant c          : sfixed(7 downto -10)  := to_sfixed(-65, 7, -10);
+    constant d		: sfixed(3 downto -10) 	:= to_sfixed(8, 3, -10);
+    
+    -- Delay in neuron when spiking. This delay allows the neuron to spike for 1 ms.
+    constant delay  	: integer 		:= 5;
+	
+    -- The current into the Tr1 and DRI neurons ends at 1015 ms. 
+    constant s_Tr1_time : integer    		:= 8120; 
+    constant s_DRI_time : integer 		:= 8120;     
 
-    constant delay0  : integer	:= 0;
-    constant delay1  : integer	:= 8;
-    constant delay5  : integer	:= 40;
-    constant delay10  : integer	:= 80;
-    constant delay20  : integer	:= 160;
-    constant delay30  : integer	:= 240;
-    constant delay35  : integer	:= 280;
-    constant delay60  : integer	:= 480;
+    -- Delays between the time of the spike of the pre-synaptic neuron and the time the current is sent to the post-synaptic neuron.
+    constant delay0  	: integer	:= 0;
+    constant delay1  	: integer	:= 8;
+    constant delay5  	: integer	:= 40;
+    constant delay10  	: integer	:= 80;
+    constant delay20  	: integer	:= 160;
+    constant delay30  	: integer	:= 240;
+    constant delay35  	: integer	:= 280;
+    constant delay60  	: integer	:= 480;
 
-    constant DEPTH10      : natural   := 10;
-    constant DEPTH35      : natural   := 35;
-    constant DEPTH60      : natural   := 60;
-    constant DEPTH30      : natural   := 30;
-    constant DEPTH20      : natural   := 20;
-    constant DEPTH5       : natural   := 5;
-    constant DEPTH1       : natural   := 1;
-
-    constant zero       : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
-    constant weight30   : sfixed(7 downto -10) := to_sfixed(30, 7, -10);
-    constant weight60n  : sfixed(7 downto -10) := to_sfixed(-60, 7, -10);
-    constant weight90n  : sfixed(7 downto -10) := to_sfixed(-90, 7, -10);
-    constant weight120n : sfixed(7 downto -10) := to_sfixed(-120, 7, -10);
+    -- The number of memory locations within the ring buffer within the synapse.
+    constant DEPTH10    : natural   	:= 10;
+    constant DEPTH35    : natural   	:= 35;
+    constant DEPTH60    : natural   	:= 60;
+    constant DEPTH30    : natural   	:= 30;
+    constant DEPTH20    : natural   	:= 20;
+    constant DEPTH5     : natural   	:= 5;
+    constant DEPTH1     : natural   	:= 1;
+	
+   -- The different magnitudes of the inhibitory and excitatory synaptic currents.
+    constant zero        : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
+    constant weight30    : sfixed(7 downto -10) := to_sfixed(30, 7, -10);
+    constant weight60n   : sfixed(7 downto -10) := to_sfixed(-60, 7, -10);
+    constant weight90n   : sfixed(7 downto -10) := to_sfixed(-90, 7, -10);
+    constant weight120n  : sfixed(7 downto -10) := to_sfixed(-120, 7, -10);
     
     signal weight_StoDRI : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
-    signal weight_TtoDr : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
-    signal weight_DrtoD : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
+    signal weight_TtoDr  : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
+    signal weight_DrtoD  : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
 
     signal weight_DtoC  : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
     signal weight_DtoVf : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
@@ -105,10 +112,10 @@ architecture RTL of network is
     signal weight_VtoVf : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
     signal weight_VtoDf : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
 
-    signal TR1_current    : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
-    signal DRI_current    : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
-    signal DRI_current1   : sfixed(8 downto -10) := to_sfixed(0, 8, -10);
-    signal DRI_current2   : sfixed(9 downto -10) := to_sfixed(0, 9, -10);
+    signal TR1_current  : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
+    signal DRI_current  : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
+    signal DRI_current1 : sfixed(8 downto -10) := to_sfixed(0, 8, -10);
+    signal DRI_current2 : sfixed(9 downto -10) := to_sfixed(0, 9, -10);
 
     signal C2_current     : sfixed(7 downto -10) := to_sfixed(0, 7, -10);
     signal C2_current1    : sfixed(8 downto -10) := to_sfixed(0, 8, -10);
@@ -157,31 +164,10 @@ architecture RTL of network is
     signal VFN_spike1     : std_logic := '0';
     signal DFNB_spike1    : std_logic := '0';
 
-   -- signal v_TR1 : sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
-   -- signal u_TR1 : sfixed(6 downto -10)  	:= to_sfixed(0, 6, -10);
-
-   -- signal v_DRI : sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
-    --signal u_DRI : sfixed(6 downto -10)  	:= to_sfixed(0, 6, -10);
-
---    signal v_DSI : sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
-  --  signal u_DSI : sfixed(6 downto -10)  	:= to_sfixed(0, 6, -10);
-
-    --signal v_C2 : sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
-    --signal u_C2 : sfixed(6 downto -10)  	:= to_sfixed(0, 6, -10);
-
---    signal v_VSI : sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
-  --  signal u_VSI : sfixed(6 downto -10)  	:= to_sfixed(0, 6, -10);
-
---    signal v_VFN : sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
-  --  signal u_VFN : sfixed(6 downto -10)  	:= to_sfixed(0, 6, -10);
-
-    --signal v_DFNB : sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
-   -- signal u_DFNB : sfixed(6 downto -10)  	:= to_sfixed(0, 6, -10);
-
     signal clk2				: std_logic			   := '0';
 
     component neuron14 is
-		Port(
+	Port(
             clk		: in std_logic;
             rst		: in std_logic;
             I_in	: in sfixed;
@@ -428,19 +414,16 @@ begin
         end if;
     end process;
 
-   -- process(clk_u)
-   -- begin
-    --    if (rising_edge(clk_u)) then
-        output1(0) <= TR1_spike;
-        output1(1) <= DRI_spike;
+   output1(0) <= TR1_spike;
+   output1(1) <= DRI_spike;
 
-        output1(2) <= DSI_spike;
-        output1(3) <= VSI_spike;
-        output1(4) <= C2_spike;
+   output1(2) <= DSI_spike;
+   output1(3) <= VSI_spike;
+   output1(4) <= C2_spike;
 
-        output1(5) <= VFN_spike;
-        output1(6) <= DFNB_spike;
-    --end process;
+   output1(5) <= VFN_spike;
+   output1(6) <= DFNB_spike;
+
 
     spike_TR1 <= TR1_spike;
     spike_DRI <= DRI_spike;
