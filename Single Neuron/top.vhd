@@ -14,62 +14,60 @@ entity top is
 	port(
 		clk		: in std_logic;
 		rst		: in std_logic;
-		
-		--vo		: out sfixed;
-		--uo		: out sfixed;
-		--spike	: out std_logic;
-		output1 : out std_logic_vector(7 downto 0)
-		--output1 : out std_logic_vector(8 downto 0)
+		output1 : out std_logic_vector(7 downto 0) -- signed integer part of v, membrane potential
 	);
 end top;
 
 architecture RTL of top is
 
-    constant a 		: sfixed(0 downto -10) 	:= to_sfixed(0.01953125, 0, -10); -- ~0.02
-    constant b 		: sfixed(0 downto -10) 	:= to_sfixed(0.2, 0, -10); 
-    constant c      : sfixed(7 downto -10)  := to_sfixed(-65, 7, -10);
-	constant d		: sfixed(3 downto -10) 	:= to_sfixed(8, 3, -10);
-    constant delay  : integer 				:= 5;
+    -- Dimensionless parameters
+    constant a 		: sfixed(0 downto -10) 		:= to_sfixed(0.01953125, 0, -10); -- ~0.02
+    constant b 		: sfixed(0 downto -10) 		:= to_sfixed(0.2, 0, -10); 
+    constant c      	: sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
+    constant d		: sfixed(3 downto -10) 		:= to_sfixed(8, 3, -10);
+    
+    constant delay  	: integer 			:= 5; -- For neuron to stay in its delay stage for 5 clock cycles so that it updates every 8 clk cycles.
 	
-    constant zero			: sfixed(7 downto -10) := to_sfixed(0, 7, -10);
-	constant weight30		: sfixed(7 downto -10) := to_sfixed(30, 7, -10);
+    constant zero	: sfixed(7 downto -10) 		:= to_sfixed(0, 7, -10);
+    constant weight30	: sfixed(7 downto -10) 		:= to_sfixed(30, 7, -10);
 	
-	signal I 				: sfixed(7 downto -10) := to_sfixed(0, 7, -10);
-	signal j 				: integer range 0 to 2400 := 0; --300*8clk cycles for one update
-	signal clk2				: std_logic			   := '0';
-	signal clk_u			: std_logic			   := '0';
+    signal I 		: sfixed(7 downto -10) 		:= to_sfixed(0, 7, -10);
+    signal j 		: integer range 0 to 2400 	:= 0; --300*8clk cycles for one update
+    signal clk2		: std_logic			:= '0';
+    signal clk_u	: std_logic			:= '0';
 	
-	signal sp				: std_logic			   := '0';
-	signal v_out	: sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
-	signal u_out	: sfixed(6 downto -10)  	:= to_sfixed(0, 6, -10);
-
-	signal o1				: std_logic			   := '0';
-	signal o2				: std_logic			   := '0';
-	signal o3				: std_logic			   := '0';
-	signal o4				: std_logic			   := '0';
-	signal o5				: std_logic			   := '0';
-	signal o6				: std_logic			   := '0';
-	signal o7				: std_logic			   := '0';
-	signal o8				: std_logic			   := '0';
+    signal sp		: std_logic			:= '0';
+    signal v_out	: sfixed(7 downto -10)  	:= to_sfixed(-65, 7, -10);
+    signal u_out	: sfixed(6 downto -10)  	:= to_sfixed(0, 6, -10);
+	
+	-- Intermediate signals for each bit for v. Cannot output a sfixed number - need to make it part of std-logic vector.
+    signal o1		: std_logic			:= '0'; 
+    signal o2		: std_logic			:= '0';
+    signal o3		: std_logic		        := '0';
+    signal o4		: std_logic		        := '0';
+    signal o5		: std_logic		        := '0';
+    signal o6		: std_logic			:= '0';
+    signal o7		: std_logic			:= '0';
+    signal o8		: std_logic			:= '0';
 
 	type FSM_States is (reset, in_I, no_I, no_I2);
 	signal current_state : FSM_States;
 	
 	component neuron is
-		Port(
-			clk		: in std_logic;
+	Port(
+	clk		: in std_logic;
             rst		: in std_logic;
             I_in	: in sfixed;
-            a       : in sfixed;
-            b       : in sfixed;
-            c       : in sfixed;
-            d       : in sfixed;
-            delay   : in integer;
+            a       	: in sfixed;
+            b       	: in sfixed;
+            c       	: in sfixed;
+            d           : in sfixed;
+            delay   	: in integer;
 
             v 		: out sfixed;
             u 		: out sfixed;
             spike	: out std_logic
-		);
+	);
 	end component;
 
 	component clk_div is
@@ -82,9 +80,10 @@ architecture RTL of top is
 	
 begin
 
-	clock 	: clk_div port map(clk => clk, rst => rst, clk_out => clk2);
-	n1		: neuron port map (clk => clk2, rst => rst, I_in => I, a => a, b => b, c => c, d => d, delay => delay, v => v_out, u => u_out, spike => sp);
-
+	clock 	: clk_div port map(clk => clk, rst => rst, clk_out => clk2); -- Takes in 5 ns clock and outputs a 8000 Hz clock.
+	n1	: neuron port map (clk => clk2, rst => rst, I_in => I, a => a, b => b, c => c, d => d, delay => delay, v => v_out, u => u_out, spike => sp);
+	
+	-- FSM that determines the current sent into the neuron. For the first 500 ms no current is sent to the neuron. After 500 ms current is sent to the neuron.
 	process(clk2, rst)
 	begin
 		if (rst = '1') then
@@ -122,7 +121,8 @@ begin
 			end case;
 		end if;
 	end process;
-
+	
+	-- Runs on 5 ns clock. Reads each bit of the integer part of 'v'. 'v' cannot be sent out directly because it is an sfixed data type.
 	process(clk)
 	begin
 		o1 <= v_out(0);
@@ -135,10 +135,7 @@ begin
 		o8 <= v_out(7);
 	end process;
 	
-									
-	--vo 	<= v_out;
-	--uo 	<= u_out;
-	--output1(7 downto 0) <= v_out(7 downto 0);
+	-- output set to the value of each bit.
 	output1(0) <= o1;
 	output1(1) <= o2;
 	output1(2) <= o3;
